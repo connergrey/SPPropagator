@@ -18,22 +18,44 @@ public class SPVecReader {
     private double cD;
     private double cR;
     private AbsoluteDate date;
+    private int satNo;
     private TimeStampedPVCoordinates tspvTEME;
 
-    public void readSPVec(String name){
+    public void readSPVec(String path, int satNo){
 
-        readSPVec(name,"");
+        // read the SP vector that the conjunction was derived from
+        String satNoString;
+        if(Integer.toString(satNo).length()==1){
+            satNoString = "0000"+Integer.toString(satNo);
+        }else if(Integer.toString(satNo).length()==2){
+            satNoString = "000"+Integer.toString(satNo);
+        }else if(Integer.toString(satNo).length()==3){
+            satNoString = "00"+Integer.toString(satNo);
+        }else if(Integer.toString(satNo).length()==4){
+            satNoString = "0"+Integer.toString(satNo);
+        }else{
+            satNoString = Integer.toString(satNo);
+        }
+        //pull the sp vector
+        String filePath = path + "/" + satNoString.substring(0,2) + "/" + satNoString + ".txt";
+
+        readSPVec(new File(filePath));
     }
 
-    public void readSPVec(String name, String folderPath){
+    public void readSPVec(String stringFileName){
+        readSPVec(new File(stringFileName));
+    }
+
+    public void readSPVec(File fName){
 
         try{
-            Scanner scan = new Scanner(new File(folderPath + name + ".txt"));
+            //System.out.println(fName);
+            Scanner scan = new Scanner(fName);
 
             // GET SAT NO
             scan.next();
             scan.next();
-            int satNo = scan.nextInt();
+            satNo = scan.nextInt();
 
             // GET DATE
             scan.nextLine();
@@ -48,7 +70,15 @@ public class SPVecReader {
             String time = scan.next();
             int hour = Integer.parseInt(time.substring(0,2));
             int min = Integer.parseInt(time.substring(3,5));
-            double sec = Double.parseDouble(time.substring(6,time.length()));
+
+            double sec = 0;
+            if(time.length() == 6) {
+                sec = scan.nextDouble();
+            }else if(time.length() == 12){
+                sec = Double.parseDouble(time.substring(6,time.length()));
+            }else{
+                System.out.println("theres still an error");
+            }
 
             Calendar calendar = Calendar.getInstance();
             calendar.set(Calendar.YEAR, year);
@@ -131,5 +161,9 @@ public class SPVecReader {
 
     public AbsoluteDate getDate() {
         return date;
+    }
+
+    public int getSatNo() {
+        return satNo;
     }
 }

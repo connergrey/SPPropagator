@@ -18,6 +18,7 @@ import org.orekit.forces.radiation.RadiationSensitive;
 import org.orekit.forces.radiation.SolarRadiationPressure;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
+import org.orekit.frames.Transform;
 import org.orekit.models.earth.atmosphere.DTM2000;
 import org.orekit.models.earth.atmosphere.DTM2000InputParameters;
 import org.orekit.models.earth.atmosphere.data.MarshallSolarActivityFutureEstimation;
@@ -46,8 +47,8 @@ public class SPPropagator {
         DataLoader loader = new DataLoader();
         loader.load(); // loads the orekit-data file to get constant parameters like tai-utc, etc.
 
-        String solarInd = "feb2022f10_prd.txt"; // EXAMPLE... Please update to the most revelant solar weather file
-        String spVectorFileName = "33063_2022056"; // EXAMPLE... SP VECTOR FILE NAME
+        String solarInd = "mar2022f10_prd.txt"; // EXAMPLE... Please update to the most revelant solar weather file
+        String spVectorFileName = "/Users/connergrey/Documents/SP VECTORS/vectors_22072/scratch/SP_VEC/33/33064"; // EXAMPLE... SP VECTOR FILE NAME
 
         // set constants
         double earthMu = Constants.EGM96_EARTH_MU;
@@ -71,79 +72,15 @@ public class SPPropagator {
         CartesianOrbit orbit = new CartesianOrbit(pvCoordinatesEME2000, eme2000, initialDate, earthMu);
 
         // Create the integrator and propagator with desired models
-        NumericalPropagator propagator = createProp(orbit, earthMu, erad, utc, degOrd, cR, cD, solarInd);
+        PropCreator propCreator = new PropCreator();
+        NumericalPropagator propagator = PropCreator.createProp(orbit, earthMu, erad, utc, degOrd, cR, cD, solarInd);
 
         //propagate
-        double propTime = 3600;
-        SpacecraftState s = propagator.propagate(initialDate,initialDate.shiftedBy(propTime)); //output in meters in EME2000
-
-    }
-
-    public static NumericalPropagator createProp(CartesianOrbit orbit, double earthMu, double erad, TimeScale utc,
-                                                 int degOrd, double cR, double dragCoeff, String solarInd){
-
-
-        IERSConventions iers = IERSConventions.IERS_2010;
-        Frame itrf = FramesFactory.getITRF(iers,false);
-        UT1Scale ut1 = TimeScalesFactory.getUT1(iers,false);
-        OneAxisEllipsoid earth = new OneAxisEllipsoid(erad, Constants.WGS84_EARTH_FLATTENING, itrf);
-
-        CelestialBody sun = CelestialBodyFactory.getSun();
-        CelestialBody moon = CelestialBodyFactory.getMoon();
-
-        double area = 1; // SRP and DRAG area considered equal
-        int degree = degOrd;
-        int order = degOrd;
-        int mass = 1;
-
-        SpacecraftState initialState = new SpacecraftState(orbit, mass);
-
-        // Setup the integrator and propagator
-        double dPos = 1e-3;
-        double minStep = 1e-18;
-        double maxStep = 600;
-
-        double[][] tolerances = NumericalPropagator.tolerances(dPos,orbit, OrbitType.CARTESIAN);
-        ODEIntegrator integrator = new DormandPrince853Integrator(minStep,maxStep,tolerances[0],tolerances[1]);
-        NumericalPropagator propagator = new NumericalPropagator(integrator);
-
-        propagator.setInitialState(initialState);
-        propagator.setPositionAngleType(PositionAngle.TRUE);
-        propagator.setOrbitType(OrbitType.CARTESIAN);
-
-        // Create force models
-        // NONSPHERE
-        NormalizedSphericalHarmonicsProvider sphereicalHarm = GravityFieldFactory.getNormalizedProvider(degree,order);
-        ForceModel nonsphere = new HolmesFeatherstoneAttractionModel(itrf,sphereicalHarm);
-
-        // SRP
-        RadiationSensitive radSens = new IsotropicRadiationSingleCoefficient(area,cR);
-        SolarRadiationPressure srp = new SolarRadiationPressure(149597870700.0,1360.8/299792458 ,sun,erad,radSens);
-        srp.addOccultingBody(moon,Constants.MOON_EQUATORIAL_RADIUS);
-
-        // LUNI SOLAR
-        ForceModel luni = new ThirdBodyAttraction(moon);
-        ForceModel solar = new ThirdBodyAttraction(sun);
-
-        // SOLID TIDES
-        TideSystem tideSystem = sphereicalHarm.getTideSystem(); //this is the only one I could find to get this info
-        ForceModel solidTide = new SolidTides(itrf,erad,earthMu,tideSystem,iers,ut1,moon,sun);
-
-        // DRAG // DTM2000 Drag Model
-        DragSensitive dragSens = new IsotropicDrag(area, dragCoeff);
-        DTM2000InputParameters dtm2000params = new MarshallSolarActivityFutureEstimation(solarInd, MarshallSolarActivityFutureEstimation.StrengthLevel.AVERAGE);
-        DTM2000 dtm2000 = new DTM2000(dtm2000params,sun, earth, utc);
-        ForceModel drag = new DragForce(dtm2000, dragSens);
-
-        // Add force models
-        propagator.addForceModel(nonsphere);
-        propagator.addForceModel(srp);
-        propagator.addForceModel(luni);
-        propagator.addForceModel(solar);
-        propagator.addForceModel(solidTide);
-        propagator.addForceModel(drag);
-
-        return propagator;
+        //double propTime = 3600;
+        AbsoluteDate finalDate = new AbsoluteDate(2022,3,14,5,43,26.191,utc);
+        SpacecraftState s = propagator.propagate(initialDate,finalDate); //output in meters in EME2000
+        Frame teme = FramesFactory.getTEME();
+        System.out.println(s.getPVCoordinates(teme).getPosition().scalarMultiply(1.0/1000));
 
     }
 
